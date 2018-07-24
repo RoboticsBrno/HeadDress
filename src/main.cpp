@@ -1,36 +1,3 @@
-// #include <Arduino.h>
-// #include <SmartLeds.h>
-
-// const int LED_COUNT = 12;
-
-// SmartLed leds( LED_WS2812, LED_COUNT, 18, 1, SingleBuffer );
-
-// void highlight( int led, Rgb color ) {
-//     for ( int i = 0; i != LED_COUNT; i++ ) {
-//         leds[ i ] = Rgb{0, 0, 0};
-//     }
-//     leds[ led ] = color;
-// }
-
-// void setup() {
-//     leds[0] = Rgb{32, 0, 0};
-//     leds[1] = Rgb{0, 32, 0};
-//     leds[2] = Rgb{0, 0, 32};
-//     leds[3] = Rgb{032, 0, 32};
-//     leds[4] = Rgb{32, 32, 0};
-// }
-
-// int counter = 0;
-
-// void loop() {
-//     if (counter == LED_COUNT)
-//         counter = 0;
-//     else
-//         counter++;
-//     highlight( counter, Rgb{ 32, 0, 0} );
-//     leds.show();
-//     delay(50);
-// }
 
 #include <Arduino.h>                //include basic Arduino library
 #include <SmartLeds.h>              //SmartLeds - library for controll intelligent leds (NEOIPIXEL) maked by: https://github.com/yaqwsx
@@ -38,13 +5,15 @@
 #include <AsyncTCP.h>               //must have library for Asynchronous Web Server maked by: https://github.com/me-no-dev
 #include <ESPAsyncWebServer.h>      //library for Asynchronous Web Server on ESP32 maked by: https://github.com/me-no-dev
 #include <webpage.h>                //header file with web page, which will ESP send to user device
+#include <DNSServer.h>
 
 AsyncWebServer server(80);          //starts web server on port 80
+DNSServer dnsServer;
 
 #define LED_PIN 18                  //data pin for intelligent leds at the top of hat
 #define LED_COUNT 14                //number of leds at the top of hat
 
-SmartLed leds (LED_WS2812, LED_COUNT, LED_PIN, 1, DoubleBuffer);                  //creates member called leds - top of the hat
+SmartLed leds (LED_WS2812, LED_COUNT, LED_PIN, 1, SingleBuffer);                  //creates member called leds - top of the hat
 
 const char *ssid = "Celenka";           //change here for WiFi AP SSID
 const char *password = "robotika";      //change here for WiFi AP password
@@ -76,21 +45,7 @@ void controlLeds()                      //main function to drive all leds effect
             leds[i] = Hsv {0, 0, 0};
         leds.show();
         break;
-    case 1:     //find - "Přivolávač kamarádů"
-        for (int i = 0; i != 3; ++i){
-            for (int j = 0; j != LED_COUNT; ++j)
-                leds[j] = Hsv {0, 0, 255};
-            leds.show();
-            ledcWrite(0, 255);
-            ledcWriteTone(0, 3000);
-            delay(100);
-            for (int j = 0; j != LED_COUNT; ++j)
-                leds[j] = Hsv {0, 0, 0};
-            leds.show();
-            ledcWriteTone(0, 0);
-            delay(300);
-        }
-        mode = 0;
+    case 1:
         break;
     case 2:     //wave - "Chci být duha"
         ++hue;
@@ -123,7 +78,7 @@ void controlLeds()                      //main function to drive all leds effect
         for(int i = 0; i != LED_COUNT; ++i)
             leds [i] = Hsv {(hue + 10), 255, beatPosition};
         leds.show();
-        delay(3);
+        delay(8);
         for (int i = 0; i != LED_COUNT; ++i)
             leds [i] = Hsv {0, 0, 0};
         if (beatPosition == 0){
@@ -148,6 +103,9 @@ void setup ()
 {
     Serial.begin(115200);               //begin Serial line with baudrate 115200
     WiFi.softAP(ssid, password);        //create WiFi AP
+
+    dnsServer.start(53, "*", WiFi.softAPIP());
+
     Serial.println(WiFi.softAPIP());    //print IP addres of ESP to debug Serial line
 
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){       //while webserver catches /GET request, procces this function
@@ -159,10 +117,7 @@ void setup ()
             if (p->name() != "cmd")                         //if name of parameter == "cmd" continue
                 continue;
             String cmd = p->value();                        //parse parameter value to separate string called "cmd"
-            if (cmd == "find"){                             //check cmd value and switch mode, add or substract brightness....
-                mode = 1;
-            }
-            else if (cmd == "wave"){
+            if (cmd == "wave"){
                 mode = 2;
             }
             else if (cmd == "snake"){
@@ -189,15 +144,6 @@ void setup ()
                 if (brightness < 0)
                     brightness = 0;
             }
-
-            else if (cmd == "rearon"){
-                rearLED = 1;
-            }
-
-            else if (cmd == "rearoff"){
-                rearLED = 0;
-            }
-
         }
         request->send_P(200, "text/html", index_html);      //sends HTML page to user
     });
@@ -207,5 +153,6 @@ void setup ()
 
 void loop ()
 {
+    dnsServer.processNextRequest();
     controlLeds();          //periodiccaly turns function to control all effects....LEDs, piezo
 }
